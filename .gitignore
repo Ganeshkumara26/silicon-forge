@@ -59,3 +59,7 @@ flake8_report.txt
 
 # Pipeline working dir
 workspace/
+
+# Case study generated output
+tests/case_study/figures/
+tests/case_study/results/
