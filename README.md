@@ -1,8 +1,10 @@
 # SiliconForge: Mixed-Signal Verification Asset Generator
 
-**SiliconForge** (formerly OscillatorLab) is an automated Electronic Design Automation (EDA) framework designed to bridge the structural divide between transistor-level analog characterization and discrete-event digital functional verification (UVM).
+> **Note:** This project is currently **under active development**. It is a work-in-progress student project and is not yet feature-complete or production-ready.
 
-By ingesting numerical simulation data (Periodic Steady State, Perturbation Projection Vectors, and Monte Carlo variance) from SPICE solvers, SiliconForge deterministically synthesizes production-ready SystemVerilog constraints, ensuring that high-throughput digital regression suites perfectly mirror the continuous-time physics of the physical silicon.
+**SiliconForge** (formerly OscillatorLab) is an experimental Electronic Design Automation (EDA) framework designed to bridge the structural divide between transistor-level analog characterization and discrete-event digital functional verification (UVM).
+
+By ingesting numerical simulation data (Periodic Steady State, Perturbation Projection Vectors, and Monte Carlo variance) from SPICE solvers, SiliconForge aims to deterministically synthesize SystemVerilog constraints, working towards ensuring that high-throughput digital regression suites mirror the continuous-time physics of the physical silicon.
 
 ---
 
@@ -16,7 +18,7 @@ In modern System-on-Chip (SoC) development, the integration of analog components
 
 ## 🛠️ The SiliconForge Architecture
 
-SiliconForge completely automates the translation of analog characterization data into digital verification assets. It acts as middleware, utilizing **Jinja2 deterministic templating** to synthesize UVM 1.2 architectures.
+SiliconForge is being built to automate the translation of analog characterization data into digital verification assets. It acts as middleware, utilizing **Jinja2 deterministic templating** to synthesize UVM 1.2 architectures.
 
 ### 1. Cycle-Accurate SVA Generation
 Ingests Periodic Steady State (PSS) waveform boundaries to synthesize a SystemVerilog Assertion (`vco_sva_pkg.sv`) package. This `bind`s to the RNM DUT, structurally guaranteeing that the digital model never exceeds physical amplitude limits ($V_{max}$, $V_{min}$) during digital regression.
@@ -81,4 +83,4 @@ Statistical 3-Sigma Coverage:     100.0%
 - `/uvm_verification`: The generated SystemVerilog UVM environment and discrete-time RNM Device Under Test.
 
 ## 🎯 Strategic Positioning
-SiliconForge demonstrates end-to-end mastery of the Mixed-Signal Verification triad: automated stimulus, automated checking, and automated measurement. By avoiding the non-determinism of LLMs in favor of strict mathematical templating, it provides a rigorous, production-ready methodology perfectly aligned with enterprise MSDV workflows.
+SiliconForge is exploring the automation of the Mixed-Signal Verification triad: stimulus, checking, and measurement. By avoiding the non-determinism of LLMs in favor of strict mathematical templating, it aims to develop a rigorous methodology aligned with enterprise MSDV workflows.
