@@ -3,7 +3,7 @@
 Generated from a full code/execution audit on 2026-07-14.
 Status legend: `Open`. Severity: `Critical` / `High` / `Medium` / `Low`.
 
-> Summary: 15 issues. The toolchain runs on real simulators (Vivado/Xyce), and the
+> Summary: 20 issues. The toolchain runs on real simulators (Vivado/Xyce), and the
 > analog→digital data bridge is real for the case-study path. However, the
 > verification pillars are not actually performing their stated function:
 > **coverage is mocked + disconnected**, **jitter injection is inert + miscalibrated**,
@@ -24,8 +24,13 @@ Status legend: `Open`. Severity: `Critical` / `High` / `Medium` / `Low`.
 | SF-011 | `v_tune` driven on net mapping to DUT input (Vivado warning) | Medium | Open | `uvm_verification/vco_agent.svh` |
 | SF-012 | SVA package + interface in one file → duplicate-definition warning | Medium | Open | `uvm_verification/vco_sva_pkg.sv` |
 | SF-013 | `run_regression.py` PHASE 4 no longer reports/checks coverage | Medium | Open | `run_regression.py` |
-| SF-014 | Fragile regex patching leaves duplicated comment in DUT | Low | Resolved | `uvm_verification/vco_rnm_dut.sv` |
-| SF-015 | No regression tests for new RTL / case-study; log path confusion | Low | Resolved | `tests/`, `run_case_study.py` |
+| SF-014 | Fragile regex patching leaves duplicated comment in DUT | Low | Open | `uvm_verification/vco_rnm_dut.sv` |
+| SF-015 | No regression tests for new RTL / case-study; log path confusion | Low | Open | `tests/`, `run_case_study.py` |
+| SF-016 | Coverage subscriber samples output **voltage**, not frequency → bins meaningless | Critical | Open | `uvm_verification/vco_agent.svh`, `vco_coverage.svh` |
+| SF-017 | RNM DUT applies jitter to 10ps sub-step, not the ~10ns clock period → jitter ~1000× wrong | Critical | Open | `uvm_verification/vco_rnm_dut.sv` |
+| SF-018 | `automation/end_to_end.py` broken: globs removed `chapter_*_*.yaml` → startup failure | Medium | Open | `siliconforge/automation/end_to_end.py` |
+| SF-019 | DUT `phase` accumulator never wrapped → `$sin` precision loss over long sims | Low | Open | `uvm_verification/vco_rnm_dut.sv` |
+| SF-020 | `vco_transaction` `v_tune` randomization unused; sequence hardcodes `v_tune=0.6` | Low | Open | `uvm_verification/vco_transaction.svh`, `vco_jitter_sequence.svh` |
 
 ---
 
@@ -163,7 +168,8 @@ Status legend: `Open`. Severity: `Critical` / `High` / `Medium` / `Low`.
   comment.
 - **Fix:** Replace the whole line including comments, or generate the DUT from a template
   (cleaner than regex-patching a hand-written file).
-- **Verdict (Current Status):** **RESOLVED**. Removing trailing comments in DUT fixed this issue.
+- **Verdict (Current Status):** **OPEN**. The duplicated comment is still present in
+  `vco_rnm_dut.sv:18` as of this audit (`F_0 = 10248776304.520353;  // 10.2488 GHz … // 10.2488 GHz …`).
 
 ## SF-015 — No tests for RTL/case-study; log path confusion  ·  Low
 - **Evidence:** `tests/` has only `test_pipeline.py`/`test_backends.py` (Python solvers);
@@ -172,4 +178,66 @@ Status legend: `Open`. Severity: `Critical` / `High` / `Medium` / `Low`.
   the implied location.
 - **Fix:** Add a pytest that runs `run_case_study.py` and asserts AFC/AAC/PLL lock; write
   logs under `tests/case_study/results/`.
-- **Verdict (Current Status):** **RESOLVED**. We introduced a dedicated case study runner `run_case_study.py` inside the case study folder.
+- **Verdict (Current Status):** **OPEN**. `tests/` still contains only `test_pipeline.py` /
+  `test_backends.py` (Python solvers); the 7 RTL modules and `run_case_study.py` have no
+  automated test.
+
+---
+
+## SF-016 — Coverage subscriber samples voltage, not frequency  ·  Critical
+- **Evidence:** `vco_agent.svh:68` `vout_ap.write(vif.v_out)` writes the DUT output
+  **voltage** (≈0.38–1.20). `vco_coverage.svh:48-49` does
+  `current_f0_khz = longint'(t / 1000.0);` i.e. it treats `t` as a frequency in Hz and
+  converts to kHz. The coverpoint bins are ~9.9e6–1.007e7 kHz (≈9.9–10.1 GHz).
+- **Impact:** Even after SF-002 connects the subscriber, the covergroup bins a voltage
+  value (~0) against frequency ranges (~1e10 kHz), so every sample is outside all bins.
+  The "3σ statistical coverage" is semantically invalid — it never sees a frequency, and
+  no frequency signal exists in the DUT/monitor to sample.
+- **Fix:** Add a frequency output (measure period from `v_out` zero-crossings, or expose
+  `f_inst`) and write that to the analysis port; or redefine the covergroup to bin the
+  signal actually produced. Do not rename voltage as frequency.
+
+## SF-017 — Jitter applied to 10ps sub-step, not the 10ns clock period  ·  Critical
+- **Evidence:** `vco_rnm_dut.sv:23` `localparam real TS = 1e-11;` (10 ps) and `:39`
+  `phase <= phase + 2*PI*f_inst*(TS + dt_jitter);`. The DUT is clocked at 100 MHz
+  (`tb_vco_top.sv:71` `forever #5 clk` → 10 ns period). `dt_jitter` is added to `TS`
+  (the internal 10 ps sub-step), never to the 10 ns clock period.
+- **Impact:** F_0 is realized by running 1000 sub-steps per 10 ns clock edge
+  (1000 × 2π·f·TS ≈ 102.5 cycles / 10 ns). Adding jitter to `TS` scales it by `dt/TS`;
+  a physically correct `dt≈45 fs` gives `45e-15/1e-11 = 4.5e-3` → **~1000× too large**
+  versus adding it to the 10 ns period (`45e-15/1e-8 = 4.5e-6`). So even a correctly
+  sized `gamma_rms` injects jitter ~1000× wrong. Compounds SF-003 (gamma 9 orders off)
+  and SF-004 (never driven).
+- **Fix:** Model jitter as a perturbation of the clock period (advance phase by
+  `2*PI*f_inst*(clk_period + dt_jitter)` per edge), or drive `dt_jitter` already scaled to
+  the clock period; keep `TS` for sub-cycle resolution only.
+
+## SF-018 — `end_to_end.py` broken by chapter-YAML removal  ·  Medium
+- **Evidence:** `siliconforge/automation/end_to_end.py` `load_chapters()` does
+  `yaml_files = sorted(root.glob("chapter_*_*.yaml"))` and has guards like
+  `_MISSING_CHAPTER_06` referencing `chapter_06_cml_frequency_bridge.yaml`. Those 14
+  files were removed from the repo root per the cleanup request.
+- **Impact:** `python -m siliconforge.automation.end_to_end` now fails at startup (no
+  chapter YAMLs found / missing-chapter guard trips). The engine is dead until retargeted.
+- **Fix:** Restore the chapter specs under a tracked path (e.g. `specs/`) and point
+  `load_chapters()` there, or remove `end_to_end.py`/`staged_design.py` if the case-study
+  path supersedes them.
+
+## SF-019 — DUT `phase` never wrapped  ·  Low
+- **Evidence:** `vco_rnm_dut.sv:39` `phase <= phase + 2*PI*f_inst*(TS + dt_jitter);`
+  accumulates without modulo. Over long runs `phase` grows large and `$sin(large_real)`
+  loses floating-point precision.
+- **Impact:** Slow numerical drift in `v_out` for extended simulations (minor at 1000
+  cycles, worse over millions).
+- **Fix:** Wrap phase: after accumulation, `if (phase > 2*PI) phase <= phase - 2*PI;`
+  (or `phase = fmod(phase, 2*PI);`).
+
+## SF-020 — `v_tune` randomization dead code  ·  Low
+- **Evidence:** `vco_transaction.svh:24-27` declares `rand int v_tune_mv` with a
+  `[0:1200]` constraint and maps it to `v_tune` in `post_randomize()`. But
+  `vco_jitter_sequence.svh:43` sets `req.v_tune = 0.6;` directly and never calls
+  `req.randomize()`, so the constraint/frequency-sweep infrastructure is never exercised.
+- **Impact:** The DUT always sees a fixed tune voltage; no tuning-range stimulus coverage.
+  Misleading "constraint-random" framing.
+- **Fix:** Randomize the transaction (`req.randomize()` with `v_tune_mv` constrained) or
+  delete the unused randomization fields.
