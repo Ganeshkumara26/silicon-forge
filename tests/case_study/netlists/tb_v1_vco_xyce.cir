@@ -1,0 +1,21 @@
+* V1 Testbench for PPV Solver
+.lib '/mnt/d/Desktop/Vault/03 Projects/vco finalized/IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/xyce/models/cornerMOSlv.lib' mos_tt
+.include 'v1_varactor_vco.cir'
+
+* Robust Xyce Nonlinear Solver Options for Verilog-A Models
+.OPTIONS NONLIN GMIN=1e-10 MAXSTEP=100 DELVMAX=0.1
+.OPTIONS TIMEINT METHOD=7
+.OPTIONS DEVICE TRANDELMIN=1e-15
+
+V_SUPPLY VDD 0 DC 1.2
+V_TUNE vtune 0 DC 0.6
+V_SS VSS 0 DC 0
+
+X_VCO out_p out_n vtune VDD VSS VCO_VARACTOR
+
+.IC V(out_p)=1.2 V(out_n)=0
+
+* Enforce strict maximum step size of 0.1ps
+.TRAN 1p 10n 0 0.1p UIC
+.PRINT TRAN v(out_p) v(out_n)
+.END

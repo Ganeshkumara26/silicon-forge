@@ -1,0 +1,23 @@
+* Incremental V1: Varactor-Tuned LC VCO Core
+.SUBCKT VCO_VARACTOR out_p out_n vtune VDD VSS
+.PARAM L_tank=172p
+.PARAM C_tank=320f
+.PARAM Cvar0=3e-13
+.PARAM KVAR=0.2
+.PARAM R_tank=221
+.PARAM I_tail=0.006
+.PARAM W_nmos=44u
+
+Ibias tail VSS DC {I_tail}
+
+* Cross-coupled NMOS pair
+X1 out_p out_n tail VSS sg13_lv_nmos w={W_nmos} l=0.13u
+X2 out_n out_p tail VSS sg13_lv_nmos w={W_nmos} l=0.13u
+
+* LC Tank
+L1 VDD out_p {L_tank}
+L2 VDD out_n {L_tank}
+C1 out_p out_n {C_tank}
+Cvar out_p out_n {Cvar0*(1 + KVAR*(V(vtune)-0.6))}
+R_TANK out_p out_n {R_tank}
+.ENDS VCO_VARACTOR
