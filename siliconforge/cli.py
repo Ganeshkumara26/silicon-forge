@@ -8,7 +8,6 @@ Command-line interface for SiliconForge platform.
 
 from __future__ import annotations
 from siliconforge.solvers.pss_shooting import shoot_newton
-from siliconforge.backends.reference_ode import ReferenceOdeBackend
 
 import argparse
 import sys

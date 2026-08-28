@@ -41,12 +41,31 @@ Concretely, this module:
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
 import logging
 import re
 from typing import Sequence
 
-from siliconforge.backends.base import ReactiveElement, ReactiveKind
 from siliconforge.exceptions import NetlistParseError
+
+logger = logging.getLogger(__name__)
+
+
+class ReactiveKind(Enum):
+    """Type of reactive element."""
+    CAPACITOR = "C"
+    INDUCTOR = "L"
+
+
+@dataclass
+class ReactiveElement:
+    """A reactive element (capacitor or inductor) in a netlist."""
+    name: str
+    node_p: str
+    node_n: str
+    kind: ReactiveKind
+    value: float = 0.0
 
 logger = logging.getLogger(__name__)
 

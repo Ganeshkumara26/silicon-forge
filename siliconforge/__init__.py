@@ -19,18 +19,6 @@ from siliconforge.core.pipeline import (
     PipelineState,
 )
 
-# Backend classes
-from siliconforge.backends.base import (
-    CircuitState,
-    ReactiveElement,
-    ReactiveKind,
-    Simulator,
-    TransientResult,
-    BenchmarkMetrics,
-)
-from siliconforge.backends.reference_ode import ReferenceOdeBackend
-from siliconforge.backends.ngspice_shared import NgspiceSharedBackend
-
 # VCO sizing
 from siliconforge.parameter_extraction.vco_core import (
     VCOComponentSizing,
@@ -137,15 +125,6 @@ __all__ = [
     "SiliconForgePipeline",
     "DesignSpecification",
     "PipelineState",
-    # Backend classes
-    "CircuitState",
-    "ReactiveElement",
-    "ReactiveKind",
-    "Simulator",
-    "TransientResult",
-    "BenchmarkMetrics",
-    "ReferenceOdeBackend",
-    "NgspiceSharedBackend",
     # VCO sizing
     "VCOComponentSizing",
     "size_vco_core",

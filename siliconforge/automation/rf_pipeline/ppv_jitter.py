@@ -24,20 +24,19 @@ def calculate_rms_jitter(L_fm, fm, f0, f_min, f_max):
     TIE_rms : RMS Time Interval Error Jitter (in seconds)
     phi_rms : RMS Phase Jitter (in radians)
     """
-    # Linear phase noise at offset fm
-    S_phi_fm = 10**(L_fm / 10.0)
+    # Linear one-sided phase noise at offset fm: L(fm)_linear = 10^(L_fm/10)
+    s_phi_linear = 10 ** (L_fm / 10.0)
 
-    # We assume an inverse-square relationship for thermal noise domination:
-    # S_phi(f) = S_phi(fm) * (fm / f)^2
-    # Integral of S_phi(f) df from f_min to f_max
-    # = S_phi_fm * fm^2 * int(1/f^2) df
-    # = S_phi_fm * fm^2 * [-1/f]_f_min^f_max
-    # = S_phi_fm * fm^2 * (1/f_min - 1/f_max)
+    # Convert single-sideband L(f) to double-sideband S_phi(f) = 2 * L(f)_linear
+    s_phi_dsb = 2.0 * s_phi_linear
 
-    integral = S_phi_fm * (fm**2) * (1.0/f_min - 1.0/f_max)
+    # Assume 1/f^2 slope: S_phi(f) = S_phi(fm) * (fm/f)^2
+    # Integral of S_phi(f) df from f_min to f_max:
+    # = S_phi_dsb * fm^2 * (1/f_min - 1/f_max)
+    integral = s_phi_dsb * (fm ** 2) * (1.0 / f_min - 1.0 / f_max)
 
-    # RMS phase jitter is sqrt(2 * integral) because L(f) is single-sideband
-    phi_rms = np.sqrt(2 * integral)
+    # RMS phase jitter
+    phi_rms = np.sqrt(integral)
 
     # Convert phase jitter to time jitter
     tie_rms = phi_rms / (2 * np.pi * f0)
