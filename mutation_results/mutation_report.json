@@ -1,0 +1,91 @@
+{
+  "total": 12,
+  "detected": 0,
+  "missed": 12,
+  "results": [
+    {
+      "mutation": "capacitance_plus20pct",
+      "expected": "PSS frequency outside tolerance",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "capacitance_minus20pct",
+      "expected": "PSS frequency outside tolerance",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "inductance_plus50pct",
+      "expected": "PSS frequency outside tolerance",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "transistor_width_double",
+      "expected": "Startup margin or amplitude change",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "bias_removed",
+      "expected": "PSS non-convergence",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "supply_voltage_zero",
+      "expected": "PSS non-convergence",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "loop_filter_r_open",
+      "expected": "PLL lock failure",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "divider_ratio_wrong",
+      "expected": "Output frequency outside tolerance",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "ppv_sign_flipped",
+      "expected": "Direct vs adjoint PPV mismatch",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "rtl_grant_duplicated",
+      "expected": "Formal: mutual exclusion counterexample",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "timing_violation_setup",
+      "expected": "Formal: timing property counterexample",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    },
+    {
+      "mutation": "charge_pump_current_zero",
+      "expected": "PLL lock failure",
+      "actual": "NOT_IMPLEMENTED",
+      "detected": false,
+      "details": "Mutation testing is a design skeleton. Implement _apply_and_test() to load a design config, apply the mutation, run the pipeline, and check detection."
+    }
+  ]
+}

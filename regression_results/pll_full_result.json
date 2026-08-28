@@ -1,0 +1,73 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T16:31:03.888599+00:00",
+  "design": {
+    "name": "pll_full",
+    "pdk": "ihp_sg13g2",
+    "simulator": "ngspice"
+  },
+  "metadata": {
+    "description": "Complete PLL system \u2014 full integration test",
+    "category": "system",
+    "expected_to_fail": false,
+    "data_source": "analytical_estimate",
+    "warning": "Results are TYPICAL ESTIMATES for demonstration only. Use --use-spice for measured values."
+  },
+  "pss": {
+    "converged": true,
+    "frequency_hz": 10250000000.0,
+    "period_s": 9.75609756097561e-11,
+    "iterations": 0,
+    "residual": null,
+    "transient_crosscheck": {
+      "performed": false,
+      "frequency_hz": null,
+      "relative_error": null
+    },
+    "note": "Frequency from config, not measured."
+  },
+  "ppv": {
+    "method": null,
+    "validated": false,
+    "direct_vs_adjoint": {
+      "performed": false,
+      "max_discrepancy": null
+    }
+  },
+  "phase_noise": {
+    "total_dbc_per_hz": null,
+    "offset_hz": null,
+    "breakdown": [],
+    "reference_crosscheck": {
+      "performed": false,
+      "reference_method": null,
+      "max_discrepancy_db": null
+    }
+  },
+  "jitter": {
+    "rms_tie_s": 3.788277294731075e-13,
+    "rms_tie_fs": 378.8277294731075,
+    "f0_hz": 10250000000.0,
+    "fmin_hz": 10000.0,
+    "fmax_hz": 5125000000.0,
+    "integration_method": "leeson_model_estimate",
+    "convention": "one-sided L(f) -> double-sideband S_phi(f); Leeson model estimate",
+    "note": "Jitter estimated from Leeson phase noise model (Q=8.0, P=5.0mW, F=6.0dB). For accurate value, run 9-stage pipeline with SPICE .noise analysis.",
+    "phase_noise_model": {
+      "model": "Leeson",
+      "Q": 8.0,
+      "P_mW": 5.0,
+      "noise_figure_dB": 6.0,
+      "flicker_corner_hz": 100000.0,
+      "pn_at_1mhz_dbc_hz": -115.26338158701093
+    }
+  },
+  "formal": {
+    "solver": null,
+    "status": "NOT_IMPLEMENTED",
+    "properties_checked": 0,
+    "properties_passed": 0,
+    "counterexamples": 0
+  },
+  "overall_status": "PASS"
+}

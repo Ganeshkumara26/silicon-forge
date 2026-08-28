@@ -1,0 +1,95 @@
+{
+  "stage1_pss": {
+    "frequency_hz": 38183656379.17725,
+    "period_s": 2.6189215356162993e-11,
+    "vpp_v": 1.0999705880000001,
+    "n_crossings": 38
+  },
+  "stage2_ppv": {
+    "monodromy_eigenvalues": [
+      "(1+0j)",
+      "(0.8110386974860357+0j)"
+    ],
+    "lambda_decay": 0.8110386974860359,
+    "Q_estimated": 15.0,
+    "ppv": [
+      0.7071067811865476,
+      -0.7071067811865476
+    ],
+    "tangent": [
+      0.7071067811865475,
+      -0.7071067811865475
+    ]
+  },
+  "stage3_isf": {
+    "isf": [
+      0.7071067811865476,
+      -0.7071067811865476
+    ],
+    "c0_dc_coefficient": 0.0,
+    "dot_perp_isf": 4.266421588589642e-17,
+    "method": "adjoint_left_eigenvector"
+  },
+  "stage4_pnoise": {
+    "model": "Leeson",
+    "Q": 15.0,
+    "P_mW": 9600.0,
+    "NF_db": 4.0,
+    "flicker_corner_hz": 50000.0,
+    "L_10khz_dbc_hz": -72.65028604012177,
+    "L_100khz_dbc_hz": -98.64375466592409,
+    "L_1mhz_dbc_hz": -120.1986120853516
+  },
+  "stage4b_pnoise_spice": {
+    "model": "pss_perturbation",
+    "n_noise_sources": 4,
+    "L_10khz_dbc_hz": -125.37607538751487,
+    "L_100khz_dbc_hz": -125.376075389054,
+    "L_1mhz_dbc_hz": -125.37607538920902
+  },
+  "stage5_multipart": {
+    "tank_dominant": true,
+    "L_tank_1mhz": -120.1986120853516,
+    "L_tail_1mhz": -117.1986120853516,
+    "L_device_1mhz": -114.1986120853516
+  },
+  "stage6_jitter": {
+    "tie_rms_s": 3.578393501465935e-15,
+    "tie_rms_fs": 3.578393501465935,
+    "phi_rms_rad": 0.0008585102365973207,
+    "phi_rms_deg": 0.049189013225804226
+  },
+  "stage7_veriloga": {
+    "model_path": "D:\\Desktop\\Vault\\03 Projects\\Ganeshas projects\\ppv guided clock generation adpll\\siliconforge\\pipeline_results\\vco_30ghz.va",
+    "f0_ghz": 38.18365637917725,
+    "vpp_v": 1.0999705880000001,
+    "Q": 15.0
+  },
+  "stage8_adjoint": {
+    "adjoint_residual": 0.0,
+    "ppv_residual": 0.0,
+    "dot_ppv_isf": 1.0000000000000002,
+    "adjoint_valid": "True",
+    "ppv_valid": "True"
+  },
+  "stage9_pvt": {
+    "corners": {
+      "TT_27C_NomV": {
+        "vpp": 0.322952,
+        "frequency_hz": null,
+        "converged": true
+      },
+      "FF_m40C_HighV": {
+        "vpp": 0.3214,
+        "frequency_hz": null,
+        "converged": true
+      },
+      "SS_125C_LowV": {
+        "vpp": 0.291121,
+        "frequency_hz": null,
+        "converged": true
+      }
+    },
+    "netlist_dir": "D:\\Desktop\\Vault\\03 Projects\\Ganeshas projects\\dual_band_radar_soc\\reruns\\30ghz_vco"
+  }
+}

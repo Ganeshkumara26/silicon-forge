@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T16:31:03.890277+00:00",
+  "design": {
+    "name": "broken_circuit",
+    "pdk": "ihp_sg13g2",
+    "simulator": "ngspice"
+  },
+  "metadata": {
+    "description": "Intentionally broken circuit \u2014 failure detection test",
+    "category": "negative_test",
+    "expected_to_fail": true
+  },
+  "pss": {
+    "converged": false,
+    "frequency_hz": 0,
+    "period_s": null,
+    "iterations": null,
+    "residual": null,
+    "transient_crosscheck": {
+      "performed": false,
+      "frequency_hz": null,
+      "relative_error": null
+    }
+  },
+  "ppv": {
+    "method": null,
+    "validated": false,
+    "direct_vs_adjoint": {
+      "performed": false,
+      "max_discrepancy": null
+    }
+  },
+  "phase_noise": {
+    "total_dbc_per_hz": null,
+    "offset_hz": null,
+    "breakdown": [],
+    "reference_crosscheck": {
+      "performed": false,
+      "reference_method": null,
+      "max_discrepancy_db": null
+    }
+  },
+  "jitter": {
+    "rms_tie_s": null,
+    "rms_tie_fs": null,
+    "f0_hz": null,
+    "fmin_hz": null,
+    "fmax_hz": null,
+    "integration_method": null,
+    "convention": null
+  },
+  "formal": {
+    "solver": null,
+    "status": null,
+    "properties_checked": 0,
+    "properties_passed": 0,
+    "counterexamples": 0
+  },
+  "overall_status": "EXPECTED_FAIL",
+  "note": "Circuit intentionally broken \u2014 PSS non-convergence is correct behavior"
+}

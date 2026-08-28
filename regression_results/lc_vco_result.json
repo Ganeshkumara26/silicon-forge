@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T16:30:35.397145+00:00",
+  "design": {
+    "name": "lc_vco",
+    "pdk": "ihp_sg13g2",
+    "simulator": "ngspice"
+  },
+  "metadata": {
+    "description": "Basic LC VCO \u2014 validates PSS convergence on ideal LC tank",
+    "category": "oscillator",
+    "expected_to_fail": false
+  },
+  "pss": {
+    "converged": true,
+    "frequency_hz": 3546750000.0,
+    "period_s": 2.819482624938324e-10,
+    "iterations": 1,
+    "residual": null,
+    "transient_crosscheck": {
+      "performed": true,
+      "frequency_hz": 3546770000.0,
+      "relative_error": 5.638965249876648e-06
+    }
+  },
+  "ppv": {
+    "method": null,
+    "validated": false,
+    "direct_vs_adjoint": {
+      "performed": false,
+      "max_discrepancy": null
+    }
+  },
+  "phase_noise": {
+    "total_dbc_per_hz": null,
+    "offset_hz": null,
+    "breakdown": [],
+    "reference_crosscheck": {
+      "performed": false,
+      "reference_method": null,
+      "max_discrepancy_db": null
+    }
+  },
+  "jitter": {
+    "rms_tie_s": 1.010205630649158e-12,
+    "rms_tie_fs": 1010.205630649158,
+    "f0_hz": 3546750000.0,
+    "fmin_hz": 10000.0,
+    "fmax_hz": 1773375000.0,
+    "integration_method": "leeson_model_estimate",
+    "convention": "one-sided L(f) -> double-sideband S_phi(f); Leeson model estimate",
+    "note": "Jitter estimated from Leeson phase noise model (Q=3.0, P=5.0mW, F=6.0dB). For accurate value, run 9-stage pipeline with SPICE .noise analysis.",
+    "phase_noise_model": {
+      "model": "Leeson",
+      "Q": 3.0,
+      "P_mW": 5.0,
+      "noise_figure_dB": 6.0,
+      "flicker_corner_hz": 100000.0,
+      "pn_at_1mhz_dbc_hz": -115.96187085477864
+    }
+  },
+  "formal": {
+    "solver": null,
+    "status": null,
+    "properties_checked": 0,
+    "properties_passed": 0,
+    "counterexamples": 0
+  },
+  "overall_status": "PASS"
+}

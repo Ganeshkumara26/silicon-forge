@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T16:30:16.648681+00:00",
+  "design": {
+    "name": "vco_30ghz_hbt",
+    "pdk": "ihp_sg13g2",
+    "simulator": "ngspice"
+  },
+  "metadata": {
+    "description": "30 GHz HBT VCO benchmark \u2014 dual_band_radar_soc",
+    "category": "oscillator_xyce",
+    "expected_to_fail": false
+  },
+  "pss": {
+    "converged": true,
+    "frequency_hz": 38183656379.17725,
+    "period_s": 2.6189215356162993e-11,
+    "iterations": null,
+    "residual": null,
+    "transient_crosscheck": {
+      "performed": false,
+      "frequency_hz": null,
+      "relative_error": null
+    }
+  },
+  "ppv": {
+    "method": null,
+    "validated": false,
+    "direct_vs_adjoint": {
+      "performed": false,
+      "max_discrepancy": null
+    }
+  },
+  "phase_noise": {
+    "total_dbc_per_hz": null,
+    "offset_hz": null,
+    "breakdown": [],
+    "reference_crosscheck": {
+      "performed": false,
+      "reference_method": null,
+      "max_discrepancy_db": null
+    }
+  },
+  "jitter": {
+    "rms_tie_s": 4.5e-14,
+    "rms_tie_fs": 45.0,
+    "f0_hz": 38183656379.17725,
+    "fmin_hz": 10000.0,
+    "fmax_hz": 19091828189.588627,
+    "integration_method": "xyce_measured",
+    "convention": "one-sided L(f); measured from Xyce transient"
+  },
+  "formal": {
+    "solver": null,
+    "status": null,
+    "properties_checked": 0,
+    "properties_passed": 0,
+    "counterexamples": 0
+  },
+  "overall_status": "PASS"
+}

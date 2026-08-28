@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T16:31:03Z",
+  "suite_status": "PASS",
+  "summary": {
+    "total": 19,
+    "pass": 18,
+    "fail": 0,
+    "expected_fail": 1,
+    "skipped": 0,
+    "incomplete": 0
+  },
+  "elapsed_seconds": 66.71,
+  "failures": [],
+  "expected_failures": [
+    "broken_circuit"
+  ],
+  "circuit_results": [
+    {
+      "design": "nmos_oscillator",
+      "status": "PASS",
+      "f0_ghz": 10.2145,
+      "jitter_fs": 378.8277314022672
+    },
+    {
+      "design": "hbt_oscillator",
+      "status": "PASS",
+      "f0_ghz": 10.4033,
+      "jitter_fs": 378.8277214174396
+    },
+    {
+      "design": "vco_30ghz_hbt",
+      "status": "PASS",
+      "f0_ghz": 38.18365637917725,
+      "jitter_fs": 45.0
+    },
+    {
+      "design": "vco_30ghz_tt",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "vco_30ghz_ff",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "vco_30ghz_ss",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "lc_vco",
+      "status": "PASS",
+      "f0_ghz": 3.54675,
+      "jitter_fs": 1010.205630649158
+    },
+    {
+      "design": "ring_oscillator",
+      "status": "PASS",
+      "f0_ghz": 10.8586,
+      "jitter_fs": 378.82769990176683
+    },
+    {
+      "design": "differential_vco",
+      "status": "PASS",
+      "f0_ghz": 6.70485,
+      "jitter_fs": 378.8281511512756
+    },
+    {
+      "design": "cml_divider",
+      "status": "PASS",
+      "f0_ghz": 2.05,
+      "jitter_fs": null
+    },
+    {
+      "design": "pll_behavioral",
+      "status": "PASS",
+      "f0_ghz": 10.25,
+      "jitter_fs": 378.8277294731075
+    },
+    {
+      "design": "charge_pump",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "opamp",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "comparator",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "sar_adc",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "dac",
+      "status": "PASS",
+      "f0_ghz": null,
+      "jitter_fs": null
+    },
+    {
+      "design": "pll_full",
+      "status": "PASS",
+      "f0_ghz": 10.25,
+      "jitter_fs": 378.8277294731075
+    },
+    {
+      "design": "adpll",
+      "status": "PASS",
+      "f0_ghz": 10.25,
+      "jitter_fs": 378.8277294731075
+    },
+    {
+      "design": "broken_circuit",
+      "status": "EXPECTED_FAIL",
+      "f0_ghz": null,
+      "jitter_fs": null
+    }
+  ]
+}
