@@ -16,13 +16,23 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy.sparse.linalg import gmres, LinearOperator
 
-from siliconforge.backends.base import CircuitState, Simulator
-
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class CircuitState:
+    """Minimal state container (replaces backends.base.CircuitState)."""
+    time: float = 0.0
+    values: dict = None
+
+    def __post_init__(self):
+        if self.values is None:
+            self.values = {}
 
 
 @dataclass
@@ -38,7 +48,7 @@ class PSSResult:
     period_s: float
 
 
-def _state_transition(sim: Simulator, element_names: list[str], x0: np.ndarray, period: float) -> CircuitState:
+def _state_transition(sim: Any, element_names: list[str], x0: np.ndarray, period: float) -> CircuitState:
     """Evaluate state transition phi(T, x0) -> x(T).
 
     Inject initial condition x0 into simulator, run one period of transient,
@@ -52,7 +62,7 @@ def _state_transition(sim: Simulator, element_names: list[str], x0: np.ndarray, 
 
 
 def shoot_newton(
-    sim: Simulator,
+    sim: Any,
     period: float,
     max_iterations: int = 100,
     residual_tol: float = 1e-10,
@@ -66,7 +76,7 @@ def shoot_newton(
 
     Parameters
     ----------
-    sim : Simulator
+    sim : Any
         The loaded circuit simulator
     period : float
         Expected oscillation period (seconds)
@@ -178,7 +188,7 @@ def shoot_newton(
 
 
 def find_limit_cycle_period(
-    sim: Simulator,
+    sim: Any,
     f_guess_hz: float,
     f_search_range_hz: float = 0.1,
 ) -> float:

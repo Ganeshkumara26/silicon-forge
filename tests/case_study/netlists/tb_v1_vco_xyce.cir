@@ -1,5 +1,5 @@
 * V1 Testbench for PPV Solver
-.lib '/mnt/d/Desktop/Vault/03 Projects/vco finalized/IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/xyce/models/cornerMOSlv.lib' mos_tt
+.lib '/mnt/d/Desktop/Vault/03 Projects/Ganeshas projects/ppv guided clock generation adpll/vco/IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/xyce/models/cornerMOSlv.lib' mos_tt
 .include 'v1_varactor_vco.cir'
 
 * Robust Xyce Nonlinear Solver Options for Verilog-A Models
