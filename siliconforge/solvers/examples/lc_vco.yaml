@@ -1,0 +1,34 @@
+design:
+  name: lc_vco_5ghz
+  pdk: ihp_sg13g2
+  simulator: ngspice
+
+pss:
+  fundamental_frequency: auto
+  convergence_tolerance: 1e-9
+  max_iterations: 30
+  transient_crosscheck: true
+
+ppv:
+  method: adjoint
+  phase_points: 32
+
+noise:
+  carrier_frequency: auto
+  offset_range_hz: [1000.0, 500000000.0]
+  offset_points: 100
+
+jitter:
+  fmin_hz: 1000.0
+  fmax_hz: 250000000.0
+  integration_method: curve
+
+formal:
+  solver: z3
+  proof_depth: 10
+
+parameters:
+  f0: 5000000000.0
+  L_nh: 0.5
+  C_total_ff: 200.0
+  I_tail_ma: 4.0

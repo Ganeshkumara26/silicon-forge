@@ -1,0 +1,40 @@
+* LC VCO — Ideal component test for PSS validation
+* Uses ideal L/C with negative-R active device (cross-coupled pair with simplified models)
+* No PDK required — validates framework on arbitrary ideal circuits
+.options method=gear reltol=1e-6 temp=27
+
+* Supply
+VDD vdd 0 DC 1.2
+
+* Tail current
+Ibias tail 0 4m
+
+* Cross-coupled pair using simplified Level-1 MOSFET models
+.model nmos_lv nmos level=1 vto=0.4 kp=200e-6 lambda=0.1
+.model pmos_lv pmos level=1 vto=-0.4 kp=100e-6 lambda=0.1
+
+M1 out_p out_n tail 0 nmos_lv w=20u l=0.13u
+M2 out_n out_p tail 0 nmos_lv w=20u l=0.13u
+M3 out_p out_n vdd vdd pmos_lv w=40u l=0.13u
+M4 out_n out_p vdd vdd pmos_lv w=40u l=0.13u
+
+* LC Tank (target ~5 GHz with L=1nH, C=1pF)
+* f0 = 1/(2*pi*sqrt(L*C)) = 1/(2*pi*sqrt(1e-9 * 1e-12)) = 5.033 GHz
+L1 vdd out_p 1n
+L2 vdd out_n 1n
+C1 out_p out_n 1p
+Rtank out_p out_n 500
+
+* Startup kick
+I_kick out_p out_n PWL(0 0 1p 2m 2p 0)
+
+* Analysis
+.control
+    tran 0.1p 20n
+    meas tran t1 WHEN v(out_p)=v(out_n) CROSS=3
+    meas tran t2 WHEN v(out_p)=v(out_n) CROSS=5
+    let freq = 1/(t2-t1)
+    print freq
+    quit
+.endc
+.end

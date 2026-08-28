@@ -1,0 +1,45 @@
+design:
+  name: adpll_10ghz
+  pdk: ihp_sg13g2
+  simulator: ngspice
+
+pss:
+  fundamental_frequency: auto
+  convergence_tolerance: 1e-9
+  max_iterations: 50
+  transient_crosscheck: true
+
+ppv:
+  method: adjoint
+  phase_points: 64
+  charge_injection_fc: 5.0
+  validate_against: direct
+
+noise:
+  carrier_frequency: auto
+  offset_range_hz: [1000.0, 1000000000.0]
+  offset_points: 200
+  include_flicker: true
+  include_thermal: true
+  reference_crosscheck: false
+
+jitter:
+  fmin_hz: 10000.0
+  fmax_hz: 1000000000.0
+  integration_method: curve
+  convention: one-sided
+
+formal:
+  solver: z3
+  proof_depth: 20
+  properties:
+    - safety
+    - liveness
+    - interface
+
+parameters:
+  f0: 10250000000.0
+  divider: 205
+  Icp: 0.001
+  prescaler_ratio: 5
+  ref_freq: 50000000.0

@@ -1,0 +1,39 @@
+* Differential LC VCO — NMOS cross-coupled with ideal LC tank
+* Derived from validated vco_nmos_test.cir with modified tank for ~5 GHz
+* Uses IHP SG13G2 NMOS subcircuit models via PDK symlink
+.options method=gear reltol=1e-4 temp=27
+
+* Include IHP SG13G2 NMOS models
+.lib '/tmp/ihp_sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib' mos_tt
+
+* Supply
+VDD vdd 0 DC 1.2
+
+* Tail current
+Ibias tail 0 4m
+
+* Cross-coupled NMOS pair (using subcircuit call like validated netlist)
+X1 out_p out_n tail 0 sg13_lv_nmos w=30u l=0.13u
+X2 out_n out_p tail 0 sg13_lv_nmos w=30u l=0.13u
+
+* LC Tank — target ~5 GHz
+* f0 = 1/(2*pi*sqrt(L*C)) with L=500pH, C=2pF -> ~5.03 GHz
+* Include significant parasitic capacitance from transistors
+L1 vdd out_p 500p
+L2 vdd out_n 500p
+C1 out_p out_n 500f
+Rtank out_p out_n 300
+
+* Startup kick
+I_kick out_p out_n PWL(0 0 1p 1m 2p 0)
+
+* Analysis
+.control
+    tran 0.1p 30n
+    meas tran t1 WHEN v(out_p)=v(out_n) CROSS=3
+    meas tran t2 WHEN v(out_p)=v(out_n) CROSS=5
+    let freq = 1/(t2-t1)
+    print freq
+    quit
+.endc
+.end

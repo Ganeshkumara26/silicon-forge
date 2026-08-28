@@ -1,0 +1,46 @@
+* Ring Oscillator — 5-stage inverter chain (explicit, no subcircuits)
+* Uses ideal Level-1 MOSFET models (no PDK needed)
+* Validates framework on non-LC oscillator topology
+.options method=gear reltol=1e-4 temp=27
+
+* Supply — use PWL for startup ramp (helps convergence)
+VDD vdd 0 PWL(0 0 1n 1.2)
+
+* Inverter models — slightly reduced kp for better convergence
+.model nmos_ring nmos level=1 vto=0.4 kp=100e-6 lambda=0.05
+.model pmos_ring pmos level=1 vto=-0.4 kp=50e-6 lambda=0.05
+
+* 5-stage ring oscillator (odd number required for oscillation)
+* Stage 1: out1 -> out2
+M1 out2 out1 vdd vdd pmos_ring w=10u l=0.13u
+M2 out2 out1 0 0 nmos_ring w=5u l=0.13u
+* Stage 2: out2 -> out3
+M3 out3 out2 vdd vdd pmos_ring w=10u l=0.13u
+M4 out3 out2 0 0 nmos_ring w=5u l=0.13u
+* Stage 3: out3 -> out4
+M5 out4 out3 vdd vdd pmos_ring w=10u l=0.13u
+M6 out4 out3 0 0 nmos_ring w=5u l=0.13u
+* Stage 4: out4 -> out5
+M7 out5 out4 vdd vdd pmos_ring w=10u l=0.13u
+M8 out5 out4 0 0 nmos_ring w=5u l=0.13u
+* Stage 5: out5 -> out1 (closes the loop)
+M9 out1 out5 vdd vdd pmos_ring w=10u l=0.13u
+M10 out1 out5 0 0 nmos_ring w=5u l=0.13u
+
+* Small load capacitors to stabilize nodes
+Cload1 out1 0 5f
+Cload2 out2 0 5f
+Cload3 out3 0 5f
+Cload4 out4 0 5f
+Cload5 out5 0 5f
+
+* Analysis
+.control
+    tran 0.5p 100n
+    meas tran t1 WHEN v(out1)=0.6 RISE=5
+    meas tran t2 WHEN v(out1)=0.6 RISE=9
+    let freq = 1/(t2-t1)
+    print freq
+    quit
+.endc
+.end
