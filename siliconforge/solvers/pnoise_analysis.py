@@ -36,26 +36,62 @@ def leeson_phase_noise(
     f_offset_hz: float,
     v_swing_v: float,
     q_loaded: float,
-    f_corner_hz: float = 1e6,
-    flicker_noise_spectral_density: float = 5e-2,
-    q_max: float = 15.0,
+    f_corner_hz: float = 100e3,
+    noise_figure_db: float = 6.0,
+    temperature_k: float = 300.0,
 ) -> float:
-    """Compute single-sideband phase noise via Leeson model."""
+    """Compute single-sideband phase noise via the Leeson model.
+
+    Standard Leeson formula:
+        L(fm) = 10*log10[ (2*k_B*T*F / P) * (1 + (f0/(2*Q*fm))^2) * (1 + fc/fm) ]
+
+    Parameters
+    ----------
+    f_osc_hz : float
+        Carrier frequency [Hz]
+    f_offset_hz : float
+        Offset frequency from carrier [Hz]
+    v_swing_v : float
+        Peak-to-peak voltage swing [V]
+    q_loaded : float
+        Loaded quality factor of the tank
+    f_corner_hz : float
+        Flicker (1/f) noise corner frequency [Hz]
+    noise_figure_db : float
+        Active device noise figure [dB]
+    temperature_k : float
+        Temperature [K]
+
+    Returns
+    -------
+    float : Single-sideband phase noise L(f) in dBc/Hz
+    """
     if f_offset_hz < 1.0:
         raise ValueError(f"f_offset_hz must be >= 1 Hz; got {f_offset_hz}")
-    k_t = 1.38e-23 * 300.0
-    signal_power = v_swing_v ** 2
 
-    noise_density = k_t
-    filter_factor = (f_osc_hz / (2.0 * f_offset_hz)
-                     ) ** 2 if f_offset_hz < f_corner_hz else 1.0
-    white_noise = noise_density * filter_factor / f_offset_hz
+    k_B = 1.38e-23          # Boltzmann constant [J/K]
+    t = temperature_k        # Temperature [K]
+    f_lin = 10.0 ** (noise_figure_db / 10.0)  # Noise figure (linear)
 
-    flicker_noise = flicker_noise_spectral_density * \
-        (f_osc_hz / (q_loaded * f_offset_hz)) ** 2 / (f_offset_hz ** 3)
+    # Signal power: P = Vrms^2 / R. For a tank with peak-to-peak swing Vpp:
+    # Vrms ≈ Vpp / (2*sqrt(2)), so P ≈ (Vpp^2) / (8*R). We use the proportional
+    # quantity (no R) since Leeson model is typically calibrated empirically.
+    signal_power = (v_swing_v ** 2) / 8.0  # proportional to actual power
 
-    noise_at_offset = white_noise + flicker_noise
-    return 10.0 * math.log10(noise_at_offset / signal_power)
+    # Thermal noise floor: 2*k_B*T*F / P
+    # Factor of 2 converts one-sided L(f) to double-sideband S_phi
+    thermal_noise = 2.0 * k_B * t * f_lin / signal_power if signal_power > 0 else float('inf')
+
+    # Resonance term: (1 + (f0/(2*Q*fm))^2) creates the 1/f^2 slope
+    resonance_term = 1.0 + (f_osc_hz / (2.0 * q_loaded * f_offset_hz)) ** 2
+
+    # Flicker term: (1 + fc/fm) adds 1/f noise below the corner
+    flicker_term = 1.0 + (f_corner_hz / f_offset_hz)
+
+    # Combined Leeson model
+    noise_linear = thermal_noise * resonance_term * flicker_term
+
+    return 10.0 * math.log10(max(noise_linear, 1e-30))
 
 
 def compute_phase_noise_spectrum(

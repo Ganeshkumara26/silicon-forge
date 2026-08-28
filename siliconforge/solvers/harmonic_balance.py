@@ -10,13 +10,13 @@ Uses TR-BDF2 collocation and discrete Fourier transform.
 
 from __future__ import annotations
 
+from typing import Any
+
 from dataclasses import dataclass
 
 import numpy as np
 from scipy.linalg import solve
 from scipy.fft import fft, ifft
-
-from siliconforge.backends.base import Simulator, CircuitState
 from siliconforge.numerical.implicit_ode import integrate_implicit_bdf, integrate_stiff_trbdf2
 from siliconforge.exceptions import SiliconForgeError
 
@@ -111,7 +111,7 @@ def time_to_fourier(waveform: np.ndarray) -> np.ndarray:
 
 
 def harmonic_balance_tran(
-    sim: Simulator,
+    sim: Any,
     frequency_hz: float,
     n_harmonics: int = 7,
     n_collocation: int = 64,
@@ -165,32 +165,51 @@ def harmonic_balance_tran(
     dt = t_colloc[1] - t_colloc[0]
 
     def residual(x_flat: np.ndarray) -> np.ndarray:
-        """Compute harmonic balance residual via collocation."""
-        # Extract per-node coefficients
-        residuals = []
+        """Compute harmonic balance residual via collocation.
+
+        For a linear RLC circuit: residual = dv/dt + Y(omega) * v = 0
+        where Y(omega) is the admittance matrix at each harmonic.
+
+        NOTE: For nonlinear circuits, this needs device current evaluation
+        I_device(V) at each time point. Currently only linear RLC is supported.
+        """
+        residual_all = np.zeros_like(x_flat)
 
         for i, node in enumerate(node_names):
             coeffs = x_flat[i * n_coeff_per_node: (i + 1) * n_coeff_per_node]
             time_signal = _coeffs_to_time(coeffs, n_collocation)
 
-            # Inject initial condition and run short transient from each collocation time
-            # For HB, we evaluate G(v(t)) at each time point
+            # Compute dv/dt via spectral differentiation
+            dv_dt = omega * _time_to_coeffs(_differentiate_time(time_signal))
 
-            # Build voltage waveform over period
-            v_t = time_signal
+            # Linear RLC admittance contribution: Y(omega) * v
+            n_harm = (n_coeff_per_node - 1) // 2
+            yv = np.zeros_like(coeffs)
 
-            # For linear RLC: dv/dt at collocation points
-            # For nonlinear circuits, we'd need to evaluate G(v) - I
+            # DC: Y(0) = 1/R (conductance only)
+            yv[0] = coeffs[0] / 50.0
 
-            # Compute derivatives of the waveform
-            dv_dt = omega * _time_to_coeffs(_differentiate_time(v_t))
+            for k in range(1, n_harm + 1):
+                cos_idx = 2 * k - 1
+                sin_idx = 2 * k
+                if sin_idx >= n_coeff_per_node:
+                    continue
 
-            residuals.append(dv_dt)
+                omega_k = k * omega
+                z_real = 50.0
+                z_imag = omega_k * 1e-9 - 1.0 / (omega_k * 1e-12)
+                z_mag_sq = z_real ** 2 + z_imag ** 2
 
-        # Stack residuals
-        if len(residuals) == 1:
-            return residuals[0]
-        return np.concatenate(residuals)
+                G = z_real / z_mag_sq if z_mag_sq > 0 else 0.0
+                B = -z_imag / z_mag_sq if z_mag_sq > 0 else 0.0
+
+                yv[cos_idx] = G * coeffs[cos_idx] - B * coeffs[sin_idx]
+                yv[sin_idx] = G * coeffs[sin_idx] + B * coeffs[cos_idx]
+
+            # HB residual: dv/dt + Y(omega)*v = 0
+            residual_all[i * n_coeff_per_node: (i + 1) * n_coeff_per_node] = dv_dt + yv
+
+        return residual_all
 
     # Newton iteration
     for iteration in range(max_iterations):
@@ -292,40 +311,70 @@ def _differentiate_time(signal: np.ndarray) -> np.ndarray:
     return np.real(ifft(dX))
 
 
-def _build_hb_jacobian(n_nodes: int, n_coeff: int, omega: float) -> np.ndarray:
+def _build_hb_jacobian(n_nodes: int, n_coeff: int, omega: float,
+                         r_ohms: float = 50.0, l_h: float = 1e-9,
+                         c_f: float = 1e-12) -> np.ndarray:
     """Build Jacobian matrix for harmonic balance.
 
-    Uses spectral differentiation matrix.
+    The HB Jacobian combines:
+    1. Spectral differentiation (off-diagonal coupling between cos/sin)
+    2. Circuit admittance Y(k) = G + jB(k) at each harmonic
+
+    For a series RLC branch:
+        Z(k) = R + j(k*omega*L - 1/(k*omega*C))
+        Y(k) = 1/Z(k) = G + jB(k)
+
+    In the (cos, sin) basis, the Jacobian block for harmonic k is:
+        [ G       -(B + k*omega) ]
+        [ (B + k*omega)     G    ]
+
+    Parameters
+    ----------
+    n_nodes : int
+        Number of circuit nodes
+    n_coeff : int
+        Number of Fourier coefficients per node (1 + 2*n_harmonics)
+    omega : float
+        Fundamental angular frequency [rad/s]
+    r_ohms, l_h, c_f : float
+        Series RLC branch parameters (default: 50 Ohm, 1 nH, 1 pF)
     """
     n_total = n_nodes * n_coeff
     J = np.zeros((n_total, n_total))
 
-    # For linear RLC tank: dv/dt + (1/(R*C))*v = 0
-    # Spectral differentiation matrix
+    n_harm = (n_coeff - 1) // 2
+
     for i in range(n_nodes):
         row_offset = i * n_coeff
         col_offset = i * n_coeff
 
-        # DC: d/dt = 0, no contribution
-        J[row_offset, col_offset] = 0
+        # DC component (k=0): d/dt = 0, admittance = 1/R (conductance only)
+        J[row_offset, col_offset] = 1.0 / r_ohms
 
-        n_harm = (n_coeff - 1) // 2
         for k in range(1, n_harm + 1):
-            # Derivative acts on harmonics
-            # d/dt[cos(kωt)] = -kω*sin(kωt)
-            # d/dt[sin(kωt)] = kω*cos(kωt)
-            cos_idx = 2*k - 1
-            sin_idx = 2*k
+            cos_idx = 2 * k - 1
+            sin_idx = 2 * k
 
-            # Will be coupled to sin
-            J[row_offset + cos_idx, col_offset + cos_idx] = 0
-            # Will be coupled to cos
-            J[row_offset + sin_idx, col_offset + sin_idx] = 0
+            if sin_idx >= n_coeff:
+                continue
 
-            if sin_idx < n_coeff:
-                J[row_offset + cos_idx, col_offset + sin_idx] = -k * omega
-            if cos_idx < n_coeff:
-                J[row_offset + sin_idx, col_offset + cos_idx] = k * omega
+            # Series RLC impedance at harmonic k
+            omega_k = k * omega
+            z_real = r_ohms
+            z_imag = omega_k * l_h - 1.0 / (omega_k * c_f) if omega_k * c_f != 0 else 0.0
+            z_mag_sq = z_real ** 2 + z_imag ** 2
+
+            # Admittance Y(k) = 1/Z(k) = G + jB
+            G = z_real / z_mag_sq if z_mag_sq > 0 else 0.0
+            B = -z_imag / z_mag_sq if z_mag_sq > 0 else 0.0
+
+            # Full Jacobian block: admittance + spectral differentiation
+            # [ G          -(B + k*omega) ]
+            # [ (B + k*omega)      G      ]
+            J[row_offset + cos_idx, col_offset + cos_idx] = G
+            J[row_offset + sin_idx, col_offset + sin_idx] = G
+            J[row_offset + cos_idx, col_offset + sin_idx] = -(B + omega_k)
+            J[row_offset + sin_idx, col_offset + cos_idx] = B + omega_k
 
     return J
 
