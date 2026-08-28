@@ -239,5 +239,98 @@ Status legend: `Open`. Severity: `Critical` / `High` / `Medium` / `Low`.
   `req.randomize()`, so the constraint/frequency-sweep infrastructure is never exercised.
 - **Impact:** The DUT always sees a fixed tune voltage; no tuning-range stimulus coverage.
   Misleading "constraint-random" framing.
-- **Fix:** Randomize the transaction (`req.randomize()` with `v_tune_mv` constrained) or
-  delete the unused randomization fields.
+ - **Fix:** Randomize the transaction (`req.randomize()` with `v_tune_mv` constrained) or
+   delete the unused randomization fields.
+
+## SF-021 — Capstone SPICE netlists V1–V3 use undefined simplified MOS models (no PDK include)  ·  Critical
+- **Evidence:** `_archive_junk/power-clock-co-design/src/spice/v1_varactor_vco.cir:14-15`
+  instantiates `MN1 ... VSS nmos_rf W={W_nmos} L=0.13u` with **no `.MODEL nmos_rf`**
+  and **no `.LIB`/`.INCLUDE`** of the IHP SG13G2 PDK. V2 adds `pmos_rf` (also undefined).
+  V3 inherits V2. Contrast with `tests/case_study/netlists/v1_varactor_vco.cir` which uses
+  `sg13_lv_nmos` (real PSP103 subckt loaded via `Xyce_Plugin_PSP103_VA.so`).
+- **Impact:** All 91 capstone figures and claimed metrics (-129.5 dBc/Hz @1 MHz, 84.5 fs,
+  16.59 GHz resonance) were generated on undefined/simplified Level-3 MOS models, not the
+  real IHP PSP103 PDK. The MASTER_DOCUMENT's "strictly generated using these true physical
+  metrics" is factually incorrect (see TIMELINE.md §6).
+- **Fix:** Re-run capstone simulations with real PSP103 models, or clearly mark all capstone
+  results as "simplified-model reference only — not valid for silicon sign-off."
+
+## SF-022 — `adpll_ppv.v` uses a fake counter-based TDC instead of a real TDC  ·  High
+- **Evidence:** `_archive_junk/power-clock-co-design/src/rtl/adpll_ppv.v:23` comment:
+  *"In a real ADPLL, we would have a TDC... Here we model the phase error digitally using
+  counters."* The "TDC" is a free-running counter, not a time-to-digital converter.
+- **Impact:** The ADPLL lock behavior and jitter claims in the capstone are not based on a
+  real TDC. The "PLL Locked: NO" result in the current case study may reflect the gap
+  between this behavioral model and a real sub-cycle TDC.
+- **Fix:** Either implement a gated-ring or Vernier TDC in RTL, or document the behavioral
+  approximation explicitly in any claims derived from it.
+
+## SF-023 — `mock_spice_results.py` explicitly generates fabricated SPICE data  ·  Critical
+- **Evidence:** `_archive_junk/power-clock-co-design/src/python/mock_spice_results.py:5-16`
+  `main()` writes `ppv_convergence.json` with synthetic `10**(-val)` relative-error data
+  and prints *"Generated mock ppv_convergence.json"*. Lines 26-28: when `ppv_vector.json`
+  is missing, generates an analytical fallback (`-0.5 * sin(...)`). Lines 33-34: scales it
+  for PVT corners (`SS` ×1.15, `FF` ×0.85) without any SPICE back-annotation.
+- **Impact:** Some of the "91 figures" and "PVT corner sweep" data are explicitly synthetic,
+  not from SPICE. This was used to populate the capstone MASTER_DOCUMENT results.
+- **Fix:** Replace mock data generation with actual SPICE result parsing, or remove the
+  mock generator and clearly label any remaining synthetic data.
+
+## SF-024 — `system_integration.py` returns hardcoded simulated startup metrics  ·  Medium
+- **Evidence:** `_archive_junk/power-clock-co-design/src/python/system_integration.py:15-23`
+  `startup_sequence()` returns `{'afc_lock_time_us': 8, 'aac_settling_us': 0.02,
+  'adpll_lock_time_us': 15}` with print statements *"Step 1: AFC Locking... (simulated)"*.
+  These exact values appear in the capstone MASTER_DOCUMENT timing claims.
+- **Impact:** Startup timing claims in the capstone are not measured from simulation; they
+  are hardcoded constants that look like measured results.
+- **Fix:** Remove hardcoded values and measure actual simulation startup times, or label the
+  values as "target/estimated" rather than measured.
+
+## SF-025 — Cocotb tests in `tb_varactorless.py` print "PASSED" unconditionally  ·  High
+- **Evidence:** `_archive_junk/power-clock-co-design/src/testbenches/tb_varactorless.py:64`
+  `dut._log.info("PPV compliance test PASSED")` after only counting violations with no
+  assertion on the count. Lines 116, 163, 220, 276: all tests print "PASSED" unconditionally
+  after logging observations, without `assert` statements or pass/fail conditions.
+- **Impact:** The capstone "verification" does not actually fail on any condition. All tests
+  pass regardless of DUT behavior, including the PVT corner sweep which only logs
+  "hierarchical_access_limited" when signals are inaccessible.
+- **Fix:** Add `assert` statements with explicit pass/fail conditions (e.g. `assert
+  afc_violation_count == 0`), and fail the testbench when conditions are not met.
+
+## SF-026 — Capstone RTL constraints derived from simplified-model PPV extraction  ·  High
+- **Evidence:** `_archive_junk/power-clock-co-design/src/rtl/ppv_constraints.vh` contains
+  `PPV_PMU_SAFE_BIN_LO`, `PPV_AFC_MAX_STEP_MV`, etc. These values originate from
+  `ppv_data.json`, which was generated by the simplified-model PPV solvers (V1–V3 netlists).
+  The real-PDK PPV extraction in the current repo (`tests/case_study/`) produces different
+  safe windows and jitter values.
+- **Impact:** The behavioral RTL in `_archive_junk/power-clock-co-design/` is tuned to the
+  wrong physics. Even if re-simulated with real PDK, the digital controllers would enforce
+  constraints (safe bins, step sizes) derived from simplified models, not the real device.
+- **Fix:** Re-extract PPV/constraints from real-PDK simulations and regenerate the RTL
+  parameter headers, or clearly label the current constraints as simplified-model only.
+
+## SF-027 — `ppv_phase_tracker.v` is a free-running 3-bit counter, not real phase tracking  ·  Medium
+- **Evidence:** `_archive_junk/power-clock-co-design/src/rtl/ppv_phase_tracker.v` divides the
+  VCO period into 8 bins using a free-running counter. There is no zero-crossing detection,
+  no phase interpolation, and no relation to the actual PPV safe window (which is a
+  continuous function of time, not 8 discrete bins).
+- **Impact:** The "phase-safe" gating in all capstone RTL is based on 45° coarse bins
+  derived from simplified models. The claimed "0°–45° safe window" is an approximation
+  that does not reflect continuous PPV sensitivity.
+- **Fix:** Replace the counter with a zero-crossing-based phase tracker, or add a note that
+  the 8-bin discretization is a behavioral approximation for simulation only.
+
+## SF-028 — Project diary partially fabricated to hide capstone failure  ·  Critical
+- **Evidence:** `the_mode_that_never_corrects_itself (2).md` presents a clean heroic
+  month-by-month narrative. `MASTER_CHAT_RAW_DUMP.md` (16,677 lines) contains hundreds of
+  admissions: *"fabricated metrics"* (line 152), *"simplified Level-3 MOS models only"*
+  (lines 823, 1458), *"never use simplified models, even for xyce"* (line 8987),
+  *"must use complete IHP PDK models only; delete all simplified/modified PDK file
+  references"* (lines 9940, 9963). `AI_HANDOVER.md` mandates: *"rebuild the 182 scripts
+  and 91 figures with 100% honesty and real data."*
+- **Impact:** The project record misrepresents the capstone's technical basis. Future work
+  (thesis, publication, portfolio) built on these claims will inherit the simplified-model
+  error and risk reproducibility failures.
+- **Fix:** Treat `MASTER_CHAT_RAW_DUMP.md` as the authoritative record; mark the diary as
+  half-fabricated; rebuild capstone figures with real PDK data per `AI_HANDOVER.md`.
+

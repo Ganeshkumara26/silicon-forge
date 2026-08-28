@@ -1,86 +1,498 @@
-# SiliconForge: Mixed-Signal Verification Asset Generator
+# SiliconForge: Mixed-Signal Verification Framework
 
-> **Note:** This project is currently **under active development**. It is a work-in-progress student project and is not yet feature-complete or production-ready.
+SiliconForge is an open-source EDA framework for oscillator phase noise characterization and jitter estimation. It extracts oscillation frequency from ngspice transient simulations and estimates phase noise using the Leeson model with corrected jitter integration.
 
-**SiliconForge** (formerly OscillatorLab) is an experimental Electronic Design Automation (EDA) framework designed to bridge the structural divide between transistor-level analog characterization and discrete-event digital functional verification (UVM).
+**Validated on:** 5 oscillator topologies (NMOS VCO, HBT VCO, ideal LC VCO, ring oscillator, differential VCO) in IHP SG13G2 and generic models.
 
-By ingesting numerical simulation data (Periodic Steady State, Perturbation Projection Vectors, and Monte Carlo variance) from SPICE solvers, SiliconForge aims to deterministically synthesize SystemVerilog constraints, working towards ensuring that high-throughput digital regression suites mirror the continuous-time physics of the physical silicon.
+**Status:** Core math corrected and validated. Regression suite covers 5 circuits. Phase noise uses Leeson model (not yet validated against SPICE `.noise` — `.noise` analysis doesn't work for free-running oscillators in ngspice).
 
 ---
 
-## 🛑 The Industrial Bottleneck
+## What SiliconForge Does Well
 
-In modern System-on-Chip (SoC) development, the integration of analog components (VCOs, PMUs, SerDes) with digital control logic creates a massive verification bottleneck. 
+- **Frequency measurement:** Extracts oscillation frequency from ngspice transient simulations via zero-crossing detection. Validated on 5 circuits.
+- **Phase noise estimation:** Uses corrected Leeson model with physics-derived parameters (Q, P, NF).
+- **Jitter calculation:** Integrates phase noise with canonical definition. No double-counting.
+- **Design abstraction:** YAML/JSON config — no ADPLL-specific hardcodes.
+- **Reproducibility:** Fixed seeds, versioned schema, machine-readable results.
 
-1. **Analog Simulation is Slow:** Transistor-level co-simulation (SPICE + Verilog) takes weeks to simulate microseconds of real-time operation.
-2. **Behavioral Models are Manual:** The industry standard is to swap SPICE netlists for Real-Number Models (RNM) in SystemVerilog. However, translating the analog characterization limits (e.g., $V_{max}$, tuning ranges, phase noise profiles) into the digital testbench is a manual, highly error-prone process.
-3. **Coverage is Guessed:** Verification engineers often guess the functional coverage bins based on datasheets, leading to digital testbenches that fall out of sync with actual physical silicon limits across PVT corners.
+## What SiliconForge Does NOT Yet Do
 
-## 🛠️ The SiliconForge Architecture
+- **UVM/SVA/formal verification:** Not implemented. Previous claims were incorrect.
+- **9-stage Xyce pipeline:** Uses Xyce which is blocked on IHP PDK. Use `run_ngspice_pipeline.py` instead.
+- **SPICE `.noise` phase noise:** `.noise` analysis doesn't work for oscillators in ngspice (no stable DC point). Transient-based extraction is implemented but needs netlist debugging.
+- **Non-oscillatory circuits:** Op-amp, comparator, SAR ADC test methods are stubs.
+- **PPV/ISF from transient:** Monodromy matrix construction is approximate (requires system Jacobian for exact result).
 
-SiliconForge is being built to automate the translation of analog characterization data into digital verification assets. It acts as middleware, utilizing **Jinja2 deterministic templating** to synthesize UVM 1.2 architectures.
+---
 
-### 1. Cycle-Accurate SVA Generation
-Ingests Periodic Steady State (PSS) waveform boundaries to synthesize a SystemVerilog Assertion (`vco_sva_pkg.sv`) package. This `bind`s to the RNM DUT, structurally guaranteeing that the digital model never exceeds physical amplitude limits ($V_{max}$, $V_{min}$) during digital regression.
+## Table of Contents
 
-### 2. Physically Calibrated Jitter Sequences
-Instead of generic Gaussian noise generators, SiliconForge parses the Perturbation Projection Vector (PPV). It synthesizes a `uvm_sequence` that injects cycle-accurate phase deviations ($\Delta t$) scaled exactly by the Root-Mean-Square of the Impulse Sensitivity Function ($\Gamma_{rms}$) characterized by the Floquet analysis.
+1. [Quick Start](#quick-start)
+2. [Installation](#installation)
+3. [The 9-Stage Pipeline](#the-9-stage-pipeline)
+4. [Mixed-Signal Verification Framework](#mixed-signal-verification-framework)
+5. [Design Configuration](#design-configuration)
+6. [Regression Suite](#regression-suite)
+7. [Adding New Designs](#adding-new-designs)
+8. [Reproducibility](#reproducibility)
+9. [Troubleshooting](#troubleshooting)
 
-### 3. Automated $3\sigma$ Statistical Coverage
-SiliconForge replaces functional coverage guesswork with mathematical proof.
-- Ingests $N$ Monte Carlo outputs (e.g., 1000 Xyce runs).
-- Calculates the true statistical mean ($\mu$) and sample standard deviation ($\sigma$).
-- Synthesizes a discrete, floating-point `covergroup` partitioned into exact $\pm 3\sigma$ standard deviation bins (`vco_coverage.svh`).
+---
 
-## 🚀 Execution Workflow
-
-SiliconForge provides a master regression runner that autonomousy orchestrates the translation and verification cycle.
+## Quick Start
 
 ```bash
-python run_regression.py
+# Run the phase noise pipeline (works end-to-end)
+cd siliconforge/automation/rf_pipeline
+python run_ngspice_pipeline.py
+
+# Run the mixed-signal verification regression suite
+cd siliconforge
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner(use_spice=True).run_suite()"
+
+# List available test circuits
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner().list_circuits()"
 ```
 
-### Output Trace:
-```text
-================================================================================
-[14:32:14] PHASE 1: Verification Asset Generation
-================================================================================
-Executing: python siliconforge\asset_generator\generate_assets.py
-[SUCCESS] Generator executed perfectly.
-Executing: python siliconforge\asset_generator\generate_coverage.py
-[SUCCESS] Generator executed perfectly.
+### Pipeline Output
 
-================================================================================
-[14:32:15] PHASE 2: UVM Compilation
-================================================================================
-$ xvlog -sv -L uvm uvm_verification/*.sv uvm_verification/*.svh
-[SUCCESS] Compilation completed with 0 Errors, 0 Warnings
+The ngspice pipeline produces:
+- Oscillation frequency (from transient zero-crossing detection)
+- Phase noise spectrum (from Leeson model)
+- RMS jitter (from phase noise integration)
+- Machine-readable JSON report
 
-================================================================================
-[14:32:16] PHASE 3: Digital UVM Simulation
-================================================================================
-$ xsim tb_vco_top -R -testplusarg UVM_TESTNAME=vco_test -cov
-UVM_INFO @ 0: uvm_test_top.env.agent.sequencer [VCO_SEQ] Starting physically calibrated jitter sequence (Gamma_RMS: 1.340000e-12)
-[SUCCESS] UVM Simulation Finished cleanly.
-
-================================================================================
-[14:32:17] PHASE 4: Coverage Extraction
-================================================================================
----------------------------------------------------------
-               VERIFICATION CLOSURE REPORT                 
----------------------------------------------------------
-DUT: vco_rnm_dut
-Physical SVA Bounds Violations:   0
-Statistical 3-Sigma Coverage:     100.0%
----------------------------------------------------------
-
-[PASSED] Mathematical Variance Coverage Reached. Silicon Sign-Off Approved.
+Example output for NMOS VCO at 10.21 GHz:
+```
+Frequency:    10.2145 GHz
+L(1 MHz):     -124.8 dBc/Hz
+RMS jitter:   378.8 fs
+RMS phase:    1.39 deg
 ```
 
-## 🏗️ Repository Structure
-- `/siliconforge/analog_solvers`: The backend Python numerical engines for PSS/PPV extraction.
-- `/siliconforge/asset_generator`: The Jinja2 templating engine mapping physics to SystemVerilog.
-- `/uvm_verification`: The generated SystemVerilog UVM environment and discrete-time RNM Device Under Test.
+---
 
-## 🎯 Strategic Positioning
-SiliconForge is exploring the automation of the Mixed-Signal Verification triad: stimulus, checking, and measurement. By avoiding the non-determinism of LLMs in favor of strict mathematical templating, it aims to develop a rigorous methodology aligned with enterprise MSDV workflows.
+## Installation
+
+### Prerequisites
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| Python | 3.10+ | Core framework |
+| ngspice | 46+ | SPICE simulation |
+| openvaf | latest | Verilog-A compilation |
+| WSL | Ubuntu 22.04 | Linux environment for ngspice |
+| IHP SG13G2 PDK | 0.3.0 | Device models |
+
+### Environment Setup
+
+```bash
+# 1. Create PDK symlink (spaces in paths break ngspice)
+wsl bash -c "ln -sf '/mnt/d/Desktop/Vault/03 Projects/Ganeshas projects/ppv guided clock generation adpll/vco/IHP-Open-PDK-0.3.0/ihp-sg13g2' /tmp/ihp_sg13g2"
+
+# 2. Copy pre-compiled OSDI files
+wsl bash -c "mkdir -p /tmp/ihp_sg13g2/libs.tech/ngspice/va/{psp103,mosvar,r3_cmc}"
+wsl bash -c "cp /tmp/ihp_sg13g2/libs.tech/verilog-a/psp103/psp103.osdi /tmp/ihp_sg13g2/libs.tech/ngspice/va/psp103/"
+wsl bash -c "cp /tmp/ihp_sg13g2/libs.tech/verilog-a/mosvar/mosvar.osdi /tmp/ihp_sg13g2/libs.tech/ngspice/va/mosvar/"
+wsl bash -c "cp /tmp/ihp_sg13g2/libs.tech/verilog-a/r3_cmc/r3_cmc.osdi /tmp/ihp_sg13g2/libs.tech/ngspice/va/r3_cmc/"
+
+# 3. Compile psp103_nqs.osdi (not pre-compiled in PDK)
+wsl bash -c "cd '/mnt/d/Desktop/Vault/03 Projects/Ganeshas projects/ppv guided clock generation adpll/vco/IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/verilog-a/psp103' && openvaf psp103_nqs.va"
+wsl bash -c "cp '/mnt/d/Desktop/Vault/03 Projects/Ganeshas projects/ppv guided clock generation adpll/vco/IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/verilog-a/psp103/psp103_nqs.osdi' /tmp/ihp_sg13g2/libs.tech/ngspice/va/psp103_nqs/"
+
+# 4. Install Python dependencies
+pip install numpy scipy matplotlib pyyaml jinja2 pytest
+```
+
+### Verification
+
+```bash
+# Verify ngspice works with PDK
+wsl bash -c "export PDK_ROOT='/tmp' && ngspice -b ADPLL_10GHz/analog/vco/vco_nmos_test.cir"
+# Expected output: freq = 1.021448e+10
+```
+
+---
+
+## The 9-Stage Pipeline (Xyce — Not Usable)
+
+The original pipeline (`run_v1_pipeline.py`) uses Xyce and is **not usable** on IHP PDK (Xyce is blocked). It is kept for reference but will not run.
+
+**Use `run_ngspice_pipeline.py` instead.** It implements a working 4-stage pipeline:
+
+```
+Stage 1: Transient Simulation → Stage 2: Leeson Phase Noise → Stage 3: Jitter Integration → Stage 4: Report
+```
+
+### Pipeline Outputs
+
+| Output File | Description |
+|-------------|-------------|
+| `pipeline_results/ngspice_pn_report.json` | Full results: frequency, phase noise spectrum, jitter |
+
+---
+
+## Mixed-Signal Verification Framework
+
+The framework provides reusable infrastructure for verifying mixed-signal designs beyond the ADPLL case study.
+
+### Architecture
+
+```
+                    SiliconForge
+                        │
+          ┌─────────────┼─────────────┐
+          ↓             ↓             ↓
+     Circuit A      Circuit B      Circuit C
+          │             │             │
+       SPICE          SPICE         SPICE
+          │             │             │
+       PSS/PPV       PSS/PPV       PSS/PPV
+          │             │             │
+      PN/Jitter      PN/Jitter     PN/Jitter
+          │             │             │
+    Independent ref. Independent ref. Independent ref.
+          │             │             │
+          └─────────────┼─────────────┘
+                        ↓
+                  PASS / FAIL
+                        ↓
+                 RTL generation
+                        │
+                    Yosys
+                        │
+                     SMT2
+                        │
+                      Z3
+                        │
+              counterexample / PASS
+```
+
+### Core Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| Result Schema | `solvers/schema.py` | Canonical JSON result format |
+| Regression Suite | `solvers/regression.py` | Multi-circuit test runner |
+| Design Config | `solvers/design_config.py` | YAML/JSON design abstraction |
+| SPICE Runner | `solvers/spice_runner.py` | WSL/ngspice interface |
+| Jitter Engine | `solvers/jitter.py` | Canonical jitter calculation |
+| Mutation Tests | `solvers/mutation.py` | Negative testing |
+
+---
+
+## Design Configuration
+
+Designs are described via YAML or JSON — no hardcoded ADPLL assumptions.
+
+### Example: LC VCO
+
+```yaml
+design:
+  name: lc_vco_5ghz
+  pdk: ihp_sg13g2
+  simulator: ngspice
+
+pss:
+  fundamental_frequency: auto
+  convergence_tolerance: 1e-9
+
+ppv:
+  method: adjoint
+  phase_points: 32
+
+noise:
+  carrier_frequency: auto
+  offset_range_hz: [1000.0, 500000000.0]
+
+jitter:
+  fmin_hz: 1000.0
+  fmax_hz: 250000000.0
+  integration_method: curve
+
+parameters:
+  f0: 5000000000.0
+  L_nh: 0.5
+  C_total_ff: 200.0
+```
+
+### Loading and Using Configs
+
+```python
+from siliconforge.solvers.design_config import load_config, adpll_config
+
+# Load from file
+config = load_config("my_vco.yaml")
+
+# Use preset
+config = adpll_config()
+
+# Resolve auto-references
+config.resolve_references()
+
+# Access parameters
+print(config.pss.frequency_hz)
+print(config.jitter.fmin_hz)
+```
+
+### Available Presets
+
+| Preset | Function | Description |
+|--------|----------|-------------|
+| ADPLL | `adpll_config()` | 10.25 GHz ADPLL (IHP SG13G2) |
+| LC VCO | `lc_vco_config(f0_ghz)` | Generic LC VCO |
+| Ring Oscillator | `ring_osc_config(f0_ghz)` | Current-starved ring |
+
+---
+
+## Regression Suite
+
+The regression suite runs multiple circuits through the verification pipeline and produces a consolidated report.
+
+### Running
+
+```bash
+# Run all circuits (SPICE-enabled)
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner(use_spice=True).run_suite()"
+
+# Run specific circuits
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner(use_spice=True).run_suite(['nmos_oscillator', 'hbt_oscillator'])"
+
+# List available circuits
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner().list_circuits()"
+```
+
+### Canonical Test Circuits
+
+| ID | Topology | Netlist | Purpose |
+|----|----------|---------|---------|
+| `nmos_oscillator` | LC, CMOS | `vco_nmos_test.cir` | Basic PSS validation |
+| `hbt_oscillator` | LC, BiCMOS | `vco_hbt_test.cir` | Bipolar device model |
+| `lc_vco` | LC, ideal | `lc_vco_ideal.cir` | No PDK required |
+| `ring_oscillator` | Digital | `ring_osc_5stage.cir` | Non-LC topology |
+| `differential_vco` | LC, differential | `diff_vco_nmos_5ghz.cir` | Symmetry validation |
+| `broken_circuit` | — | — | Failure detection (negative test) |
+
+### Output Format
+
+Each run produces a canonical JSON result:
+
+```json
+{
+  "schema_version": "1.0.0",
+  "timestamp": "2026-08-28T10:32:52+00:00",
+  "design": { "name": "nmos_oscillator", "pdk": "ihp_sg13g2", "simulator": "ngspice" },
+  "pss": {
+    "converged": true,
+    "frequency_hz": 10214500000.0,
+    "transient_crosscheck": { "performed": true, "relative_error": 0.0 }
+  },
+  "jitter": {
+    "rms_tie_fs": 45.0,
+    "f0_hz": 10214500000.0,
+    "fmin_hz": 10000.0,
+    "fmax_hz": 1000000000.0,
+    "convention": "one-sided L(f) -> double-sideband S_phi(f)"
+  },
+  "overall_status": "PASS"
+}
+```
+
+### Cross-Check Mechanism
+
+Each SPICE measurement includes an independent cross-check:
+- Frequency from early zero-crossings (crossings 3-5) vs late zero-crossings (crossings 10-12)
+- Relative error < 1e-5 confirms steady-state has been reached
+- Prevents false positives from startup transients
+
+---
+
+## Adding New Designs
+
+### Step 1: Create a SPICE Netlist
+
+```spice
+* my_oscillator.cir
+.options method=gear reltol=1e-4 temp=27
+.lib '/tmp/ihp_sg13g2/libs.tech/ngspice/models/cornerMOSlv.lib' mos_tt
+
+* ... your circuit ...
+
+* Analysis
+.control
+    tran 0.1p 50n
+    meas tran t1 WHEN v(out_p)=v(out_n) CROSS=3
+    meas tran t2 WHEN v(out_p)=v(out_n) CROSS=5
+    let freq = 1/(t2-t1)
+    print freq
+    quit
+.endc
+.end
+```
+
+### Step 2: Test the Netlist
+
+```bash
+wsl bash -c "export PDK_ROOT='/tmp' && ngspice -b my_oscillator.cir"
+```
+
+### Step 3: Add to Regression Suite
+
+Edit `siliconforge/solvers/regression.py`:
+
+```python
+CANONICAL_CIRCUITS["my_oscillator"] = {
+    "name": "my_oscillator",
+    "description": "My custom oscillator",
+    "f0_nominal_hz": 5.0e9,
+    "vdd": 1.2,
+    "expected_f0_range_hz": (4.5e9, 5.5e9),
+    "category": "oscillator",
+    "netlist_path": "path/to/my_oscillator.cir",
+}
+```
+
+### Step 4: Run
+
+```bash
+python -c "from siliconforge.solvers.regression import RegressionRunner; RegressionRunner(use_spice=True).run_suite(['my_oscillator'])"
+```
+
+---
+
+## Reproducibility
+
+### Fixed Seeds and Deterministic Behavior
+
+- All random number generators use fixed seeds (seed=42)
+- SPICE simulation parameters are explicitly documented
+- No Monte Carlo sampling without recorded seed
+
+### Environment Capture
+
+```bash
+# Capture full environment state
+wsl bash -c "ngspice --version" > environment.txt
+wsl bash -c "openvaf --version" >> environment.txt
+python --version >> environment.txt
+python -c "import numpy; print(f'numpy={numpy.__version__}')" >> environment.txt
+python -c "import scipy; print(f'scipy={scipy.__version__}')" >> environment.txt
+```
+
+### Result Schema Versioning
+
+All results include `"schema_version": "1.0.0"`. Future schema changes will be backward-compatible — new fields are additive, existing fields are never removed or redefined.
+
+### Canonical Jitter Definition
+
+All jitter results use a single definition:
+
+```
+sigma_t = sqrt( integral_{f_L}^{f_H} S_phi(f) df ) / (2*pi*f_0)
+```
+
+where S_phi(f) = 2 * 10^(L(f)/10) [one-sided to double-sideband conversion]
+
+Every jitter result includes f0, fmin, fmax, integration method, and convention — preventing contradictory "jitter" numbers from the same design.
+
+---
+
+## Troubleshooting
+
+### ngspice: "file too short" for OSDI
+
+The `psp103_nqs.osdi` file is not pre-compiled in the IHP PDK. Compile it:
+
+```bash
+wsl bash -c "cd '/mnt/d/.../IHP-Open-PDK-0.3.0/ihp-sg13g2/libs.tech/verilog-a/psp103' && openvaf psp103_nqs.va"
+wsl bash -c "cp '<source>/psp103_nqs.osdi' /tmp/ihp_sg13g2/libs.tech/ngspice/va/psp103_nqs/"
+```
+
+Verify: `ls -la /tmp/ihp_sg13g2/libs.tech/ngspice/va/psp103_nqs/psp103_nqs.osdi` should show ~997KB.
+
+### ngspice: "Timestep too small"
+
+Common with ring oscillators. Solutions:
+- Use PWL supply ramp: `VDD vdd 0 PWL(0 0 1n 1.2)`
+- Add small load capacitors: `Cload out1 0 5f`
+- Reduce MOSFET kp values
+- Use `.ic` to set initial conditions
+
+### NumPy: "trapz not found"
+
+This environment uses NumPy 2.x. Use `np.trapezoid` instead of `np.trapz`. The SiliconForge solver modules have been updated.
+
+### Yosys: "Unsupported cell type $adff"
+
+Convert async-reset DFFs before SMT2 generation:
+```bash
+yosys -p 'read_verilog design.v; proc; opt; async2sync; opt; write_smt2 design.smt2'
+```
+
+### Spaces in Paths
+
+Always use the `/tmp/ihp_sg13g2` symlink. Direct paths with spaces will silently break ngspice and Yosys.
+
+---
+
+## Repository Structure
+
+```
+siliconforge/
+├── siliconforge/                  # Main package
+│   ├── solvers/                   # Numerical engines + new framework
+│   │   ├── regression.py          # Regression suite runner
+│   │   ├── schema.py              # Canonical result schema
+│   │   ├── design_config.py       # Design configuration
+│   │   ├── spice_runner.py        # WSL/ngspice interface
+│   │   ├── jitter.py              # Canonical jitter calculation
+│   │   ├── mutation.py            # Negative testing
+│   │   └── netlists/              # Test circuit netlists
+│   ├── automation/
+│   │   └── rf_pipeline/           # 9-stage PPV pipeline
+│   │       ├── run_v1_pipeline.py
+│   │       ├── shooting_method.py
+│   │       ├── ppv_direct_injection.py
+│   │       ├── ppv_breakdown.py
+│   │       ├── ppv_jitter.py
+│   │       ├── ppv_adjoint.py
+│   │       └── pvt_sweep.py
+│   ├── asset_generator/           # Jinja2 templating → SystemVerilog
+│   ├── backends/                  # Simulator abstraction
+│   │   ├── base.py                # Simulator ABC
+│   │   ├── ngspice_cli.py         # ngspice subprocess backend
+│   │   └── reference_ode.py       # Pure Python reference
+│   └── core/
+│       └── pipeline.py            # Master orchestrator
+├── tests/                         # pytest test suite
+│   ├── test_jitter.py             # Jitter integration tests
+│   ├── test_schema.py             # Result schema tests
+│   ├── test_design_config.py      # Config abstraction tests
+│   ├── test_pipeline.py           # Pipeline execution test
+│   └── test_backends.py           # Backend contract tests
+├── uvm_verification/              # Generated UVM environment
+├── regression_results/            # Regression output (JSON)
+└── run_regression.py              # Legacy regression runner
+```
+
+---
+
+## Running Tests
+
+```bash
+# Full test suite
+cd siliconforge
+python -m pytest tests/ -v
+
+# Specific test modules
+python -m pytest tests/test_jitter.py -v
+python -m pytest tests/test_schema.py -v
+python -m pytest tests/test_design_config.py -v
+```
+
+---
+
+## License
+
+SiliconForge is an open-source research project. IHP SG13G2 PDK models are subject to the IHP open PDK license.

@@ -204,6 +204,10 @@ module tb_clock_mgmt;
             $display("ERROR: AAC failed to settle");
             errors = errors + 1;
         end
+        if (!pll_locked) begin
+            $display("ERROR: PLL failed to lock");
+            errors = errors + 1;
+        end
 
         if (errors == 0) begin
             $display("\n  *** ALL TESTS PASSED ***\n");
