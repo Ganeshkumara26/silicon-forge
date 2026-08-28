@@ -1,6 +1,16 @@
+#!/usr/bin/env python3
+"""generate_assets.py — Verification Asset Generator
+
+Fixes applied:
+  - SF-005: Accepts independent --silicon-spec to source SVA bounds separately from DUT
+  - SF-009: Generates timing/period assertion in addition to amplitude
+  - When bounds == characterization, emits WARNING comment (no hidden tautology)
+"""
+
 import os
 import json
 import re
+import argparse
 from jinja2 import Environment, FileSystemLoader
 
 
@@ -18,49 +28,117 @@ def load_characterization_data():
         raise FileNotFoundError(f"characterization_data.json not found at {data_path}")
 
 
+def load_silicon_spec(spec_path):
+    """Load independent silicon specification bounds.
+
+    Expected JSON format:
+    {
+        "v_max": 1.2,
+        "v_min": 0.35,
+        "f0_min_hz": 10.0e9,
+        "f0_max_hz": 10.5e9,
+        "period_tolerance_pct": 5.0,
+        "source": "IHP SG13G2 design manual section 4.2"
+    }
+    """
+    if not spec_path or not os.path.exists(spec_path):
+        return None
+    with open(spec_path) as f:
+        spec = json.load(f)
+    print(f"[ASSETS] Loaded independent silicon spec from: {spec_path}")
+    print(f"[ASSETS] Spec source: {spec.get('source', 'unspecified')}")
+    return spec
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Verification Asset Generator")
+    parser.add_argument("--silicon-spec", type=str, default=None,
+                        help="Path to independent silicon specification JSON (required for non-tautological SVA)")
+    parser.add_argument("--allow-tautological", action="store_true",
+                        help="Allow SVA bounds to match DUT characterization (tautological — assertions can never fail)")
+    args = parser.parse_args()
+
     base_dir = os.path.dirname(os.path.abspath(__file__))
     templates_dir = os.path.join(base_dir, "templates")
     out_dir = os.path.join(os.path.dirname(base_dir), "..", "uvm_verification")
 
-    if not os.path.exists(out_dir):
-        os.makedirs(out_dir)
+    os.makedirs(out_dir, exist_ok=True)
 
-    # Initialize Jinja2 environment
     env = Environment(loader=FileSystemLoader(templates_dir))
 
-    # Load characterization data
-    data = load_characterization_data()
-    print(f"Loaded characterization data: f0={data['f_0']/1e9:.4f} GHz, "
-          f"V_pp={data.get('v_pp', 'N/A')} V, source={data.get('source', 'unknown')}")
+    # Load data sources
+    char_data = load_characterization_data()
+    silicon_spec = load_silicon_spec(args.silicon_spec)
+
+    print(f"[ASSETS] Characterization: f0={char_data['f_0']/1e9:.4f} GHz, "
+          f"V_pp={char_data.get('v_pp', 'N/A')} V, source={char_data.get('source', 'unknown')}")
+
+    # Determine SVA bounds source
+    if silicon_spec:
+        v_max = silicon_spec.get("v_max", char_data["v_max"])
+        v_min = silicon_spec.get("v_min", char_data["v_min"])
+        f0_min = silicon_spec.get("f0_min_hz")
+        f0_max = silicon_spec.get("f0_max_hz")
+        period_tol = silicon_spec.get("period_tolerance_pct", 5.0)
+        bounds_source = f"Independent silicon spec: {silicon_spec.get('source', args.silicon_spec)}"
+        is_independent = True
+    elif args.allow_tautological:
+        v_max = char_data["v_max"]
+        v_min = char_data["v_min"]
+        f0_min = None
+        f0_max = None
+        period_tol = 5.0
+        bounds_source = (
+            "WARNING: Bounds derived from SAME characterization data as DUT. "
+            "This is a tautological check — it can never fail unless there is a code bug. "
+            "Provide --silicon-spec for a meaningful independent check."
+        )
+        is_independent = False
+        print(f"[ASSETS] ⚠️  No --silicon-spec provided. SVA bounds will match DUT characterization.")
+        print(f"[ASSETS]    This produces a tautological pass. Add independent specs for real verification.")
+    else:
+        print(f"[ASSETS] ERROR: No --silicon-spec provided.")
+        print(f"[ASSETS] SVA bounds would match DUT characterization (tautological).")
+        print(f"[ASSETS] Options:")
+        print(f"[ASSETS]   1. Provide --silicon-spec <path.json> for independent bounds")
+        print(f"[ASSETS]   2. Add --allow-tautological to proceed with matching bounds")
+        print(f"[ASSETS]")
+        print(f"[ASSETS] Example silicon_spec.json:")
+        print(f'[ASSETS]   {{"v_max": 1.3, "v_min": 0.3, "source": "datasheet section 4.2"}}')
+        sys.exit(1)
 
     # Generate SVA Package
     sva_template = env.get_template("sva_package.sv.j2")
     sva_output = sva_template.render(
-        source_json=data["source"],
-        v_max=data["v_max"],
-        v_min=data["v_min"],
-        f_0=data["f_0"],
+        source_json=char_data["source"],
+        bounds_source=bounds_source,
+        v_max=v_max,
+        v_min=v_min,
+        f_0=char_data["f_0"],
+        f0_min_hz=f0_min,
+        f0_max_hz=f0_max,
+        period_tolerance_pct=period_tol,
+        is_independent=is_independent,
     )
     sva_path = os.path.join(out_dir, "vco_sva_pkg.sv")
     with open(sva_path, "w") as f:
         f.write(sva_output)
-    print(f"Generated: {os.path.abspath(sva_path)}")
+    print(f"[ASSETS] Generated: {sva_path}")
 
     # Generate UVM Sequence
     uvm_template = env.get_template("uvm_sequence.svh.j2")
     uvm_output = uvm_template.render(
-        source_json=data["source"],
-        gamma_rms=data["gamma_rms"],
-        gamma_dc=data["gamma_dc"],
-        f_0=data["f_0"],
-        num_cycles=data["num_cycles"],
-        v_tune_nom=data["v_tune_nom"],
+        source_json=char_data["source"],
+        gamma_rms=char_data["gamma_rms"],
+        gamma_dc=char_data["gamma_dc"],
+        f_0=char_data["f_0"],
+        num_cycles=char_data["num_cycles"],
+        v_tune_nom=char_data["v_tune_nom"],
     )
     uvm_path = os.path.join(out_dir, "vco_jitter_sequence.svh")
     with open(uvm_path, "w") as f:
         f.write(uvm_output)
-    print(f"Generated: {os.path.abspath(uvm_path)}")
+    print(f"[ASSETS] Generated: {uvm_path}")
 
     # Align RNM DUT parameters with characterization data
     rnm_path = os.path.join(out_dir, "vco_rnm_dut.sv")
@@ -68,29 +146,28 @@ def main():
         with open(rnm_path, "r") as f:
             rnm_content = f.read()
 
-        f0 = data["f_0"]
-        v_pp = data.get("v_pp", data["v_max"] - data["v_min"])
-        v_amplitude = v_pp / 2.0  # Half-swing: DUT uses (V_AMPLITUDE/2)*sin(phase)
-        dc_offset = (data["v_max"] + data["v_min"]) / 2.0
-        kvco = data.get("kvco_hz_per_v", 500e6)
+        f0 = char_data["f_0"]
+        v_pp = char_data.get("v_pp", char_data["v_max"] - char_data["v_min"])
+        v_amplitude = v_pp / 2.0
+        dc_offset = (char_data["v_max"] + char_data["v_min"]) / 2.0
+        kvco = char_data.get("kvco_hz_per_v", 500e6)
 
         rnm_content = re.sub(
             r"localparam real F_0\s*=\s*[^;]+;",
-            f"localparam real F_0 = {f0};  // {f0/1e9:.4f} GHz (from characterization)",
+            f"localparam real F_0 = {f0};",
             rnm_content,
         )
         rnm_content = re.sub(
             r"localparam real K_VCO\s*=\s*[^;]+;",
-            f"localparam real K_VCO = {kvco};  // {kvco/1e6:.0f} MHz/V",
+            f"localparam real K_VCO = {kvco};",
             rnm_content,
         )
         rnm_content = re.sub(
             r"localparam real V_AMPLITUDE\s*=\s*[^;]+;",
-            f"localparam real V_AMPLITUDE = {v_amplitude};  // {v_amplitude:.3f}V p-p",
+            f"localparam real V_AMPLITUDE = {v_amplitude};",
             rnm_content,
         )
 
-        # If DC_OFFSET constant exists, update it; otherwise it's computed in the always block
         if "DC_OFFSET" in rnm_content:
             rnm_content = re.sub(
                 r"localparam real DC_OFFSET\s*=\s*[^;]+;",
@@ -100,8 +177,7 @@ def main():
 
         with open(rnm_path, "w") as f:
             f.write(rnm_content)
-        print(f"Aligned RNM DUT: F_0={f0/1e9:.4f} GHz, V_AMP={v_amplitude:.3f}V, "
-              f"K_VCO={kvco/1e6:.0f} MHz/V -> {os.path.abspath(rnm_path)}")
+        print(f"[ASSETS] Aligned RNM DUT: F_0={f0/1e9:.4f} GHz, V_AMP={v_amplitude:.3f}V")
 
 
 if __name__ == "__main__":
