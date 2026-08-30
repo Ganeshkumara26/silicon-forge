@@ -991,3 +991,60 @@ Located at: `dual_band_radar_soc/reruns/30ghz_vco/`
 
 Located at: `dual_band_radar_soc/benchmarks/01_standalone_blocks/`
 - `30ghz/vco/vco_30ghz_standalone.cir` — 30 GHz HBT VCO (Xyce)
+
+---
+
+## 19. Installed EDA Tools Reference
+
+All tools verified working in WSL (Ubuntu 22.04). Tested August 2026.
+
+### 19.1 Digital Synthesis & Simulation
+
+| Tool | Version | Purpose | Status |
+|------|---------|---------|--------|
+| **Yosys** | 0.9 | Verilog synthesis, formal verification | ✅ Verified |
+| **Verilator** | 4.038 | Fast Verilog simulation (C++) | ✅ Verified |
+| **Icarus Verilog** | 11.0 | Verilog simulation | ✅ Verified |
+| **GHDL** | - | VHDL simulation | ✅ Verified |
+| **cocotb** | 2.0.1 | Python-based testbenches for HDL | ✅ Verified |
+
+### 19.2 Analog & Mixed-Signal Simulation
+
+| Tool | Version | Purpose | Status |
+|------|---------|---------|--------|
+| **ngspice** | 46+ | SPICE analog simulation | ✅ Verified |
+| **Xyce** | - | Parallel SPICE (HBT circuits) | ✅ Verified |
+| **OpenEMS** | 0.0.35 | Electromagnetic FDTD simulation | ✅ Verified |
+
+### 19.3 Physical Design & Layout
+
+| Tool | Version | Purpose | Status |
+|------|---------|---------|--------|
+| **OpenLane** | 2.3.10 | RTL-to-GDS flow | ✅ Verified |
+| **KLayout** | 0.30.10 | Layout viewer/editor | ✅ Verified |
+| **Magic** | 8.3 | Layout editor with DRC | ✅ Verified |
+
+### 19.4 Python EDA Libraries
+
+| Tool | Version | Purpose | Status |
+|------|---------|---------|--------|
+| **edalize** | 0.6.8 | EDA tool abstraction layer | ✅ Verified |
+| **siliconcompiler** | 0.38.5 | Modular build system | ✅ Verified |
+| **hdl21** | 7.0.0 | Hardware description library | ✅ Verified |
+| **scikit-rf** | 2.1.0 | RF network analysis | ✅ Verified |
+
+---
+
+## 20. SiliconForge — Phase Noise Extraction Framework
+
+### 20.1 What It Does
+
+| Capability | Status | Method |
+|------------|--------|--------|
+| Frequency measurement | Verified | Zero-crossing detection on SPICE transient |
+| Phase noise (analytical) | Verified | Leeson model with circuit parameters |
+| **Phase noise (SPICE-level)** | **Verified** | **PSS + perturbation + device noise integration** |
+| PPV/ISF extraction | Verified | Adjoint (left eigenvector) method |
+| Jitter calculation | Verified | Canonical integration of L(f) |
+| Verilog-A generation | Verified | Behavioral model from extracted parameters |
+| PVT corner sweep | Verified | TT/FF/SS corner simulation |
